@@ -1,4 +1,4 @@
-from typing import Tuple, List, Optional, Dict, Iterable
+from typing import Tuple, List, Optional, Iterable
 
 import chess
 
@@ -9,111 +9,7 @@ from reconchess.utilities import (
 )
 
 
-SENSE_SQUARES = [
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    33,
-    34,
-    35,
-    36,
-    37,
-    38,
-    41,
-    42,
-    43,
-    44,
-    45,
-    46,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
-]
-# Copied here for convenience
-[
-    A1,
-    B1,
-    C1,
-    D1,
-    E1,
-    F1,
-    G1,
-    H1,
-    A2,
-    B2,
-    C2,
-    D2,
-    E2,
-    F2,
-    G2,
-    H2,
-    A3,
-    B3,
-    C3,
-    D3,
-    E3,
-    F3,
-    G3,
-    H3,
-    A4,
-    B4,
-    C4,
-    D4,
-    E4,
-    F4,
-    G4,
-    H4,
-    A5,
-    B5,
-    C5,
-    D5,
-    E5,
-    F5,
-    G5,
-    H5,
-    A6,
-    B6,
-    C6,
-    D6,
-    E6,
-    F6,
-    G6,
-    H6,
-    A7,
-    B7,
-    C7,
-    D7,
-    E7,
-    F7,
-    G7,
-    H7,
-    A8,
-    B8,
-    C8,
-    D8,
-    E8,
-    F8,
-    G8,
-    H8,
-] = range(64)
+_BACKRANK_SQUARES = chess.SquareSet(chess.BB_BACKRANKS)
 
 
 def simulate_sense(
@@ -142,34 +38,34 @@ def simulate_move(board, move: chess.Move) -> Tuple[chess.Move, Optional[int]]:
     if is_illegal_castle(board, move):
         return chess.Move.null(), None
     # if the piece is a sliding piece, slide it as far as it can go
-    piece = board.piece_at(move.from_square)
-    if piece.piece_type in {chess.PAWN, chess.ROOK, chess.BISHOP, chess.QUEEN}:
+    if board.piece_at(move.from_square).piece_type in {chess.PAWN, chess.ROOK, chess.BISHOP, chess.QUEEN}:
         move = _slide_move(board, move)
         return move, capture_square_of_move(board, move)
     return chess.Move.null(), None
 
 
 def _slide_move(board, move: chess.Move) -> Optional[chess.Move]:
-    squares = list(chess.SquareSet(chess.between(move.from_square, move.to_square))) + [
-        move.to_square
-    ]
-    squares = sorted(
-        squares, key=lambda s: chess.square_distance(s, move.from_square), reverse=True
-    )
-    for slide_square in squares:
+    # We iterate longest to shortest so the revised move is the longest pseudo-legal move.
+    # If the to-square < from-square then we want our list in sorted order.
+    # Otherwise we want it in reverse order.
+    # In either case, we need to add the to-square to the front of our list manually.
+    squares = chess.SquareSet(chess.between(move.from_square, move.to_square))
+    if move.to_square > move.from_square:
+        squares = reversed(squares)
+    for slide_square in [move.to_square] + list(squares):
         revised = chess.Move(move.from_square, slide_square, move.promotion)
         if board.is_pseudo_legal(revised):
             return revised
     return chess.Move.null()
 
 
-def without_opponent_pieces(board):
-    return board.transform(lambda bb: bb & board.occupied_co[board.turn])
-
-
 def possible_requested_moves(board: chess.Board) -> Iterable[chess.Move]:
     no_opponents_board = without_opponent_pieces(board)
     yield from possible_requested_moves_no_op_pieces(no_opponents_board)
+
+
+def without_opponent_pieces(board):
+    return board.transform(lambda bb: bb & board.occupied_co[board.turn])
 
 
 def possible_requested_moves_no_op_pieces(
@@ -186,7 +82,7 @@ def possible_requested_moves_no_op_pieces(
                 continue
 
             # add in promotion moves
-            if attacked_square in chess.SquareSet(chess.BB_BACKRANKS):
+            if attacked_square in _BACKRANK_SQUARES:
                 for piece_type in chess.PIECE_TYPES[1:-1]:
                     yield chess.Move(pawn_square, attacked_square, promotion=piece_type)
             else:
