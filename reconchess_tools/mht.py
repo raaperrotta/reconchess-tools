@@ -1,3 +1,4 @@
+from functools import lru_cache
 from itertools import product
 from typing import List, Tuple, Optional
 
@@ -42,5 +43,5 @@ class MultiHypothesisTracker:
             if simulated_capture_square == capture_square:
                 new_board = board.copy(stack=False)
                 new_board.push(taken_move)
-                new_boards[board_fingerprint(board)] = new_board
+                new_boards[board_fingerprint(new_board)] = new_board
         self.boards = list(new_boards.values())
