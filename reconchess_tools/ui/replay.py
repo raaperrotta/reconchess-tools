@@ -10,9 +10,7 @@ from reconchess_tools.history import History
 
 
 # block output from pygame
-from reconchess_tools.ui import PIECE_IMAGES, draw_empty_board
-
-
+from reconchess_tools.ui import PIECE_IMAGES, draw_empty_board, draw_pieces, draw_board
 
 SENSE, MOVE = False, True
 
@@ -27,15 +25,23 @@ class Replay:
         pygame.display.set_icon(
             pygame.transform.scale(PIECE_IMAGES[chess.Piece(chess.KING, chess.WHITE)], (32, 32)))
 
-        self.font = pygame.font.SysFont(pygame.font.get_default_font(), 18)
+        self.header = pygame.font.SysFont(pygame.font.get_default_font(), 18)
 
-        self.width = 1400
-        self.height = 400
+        self.square_size = 50
+        self.width = self.square_size * 17
+        self.height = self.square_size * 18
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.background = pygame.Surface((self.screen.get_size()))
-        draw_empty_board(self.background, self.font, 0, 0, 400)
-        draw_empty_board(self.background, self.font, 500, 0, 400)
-        draw_empty_board(self.background, self.font, 1000, 0, 400)
+        self.background.fill((255, 255, 255))
+        surface = draw_board(chess.Board(), self.square_size * 8, 255,
+                             pygame.font.SysFont(pygame.font.get_default_font(), 18))
+        self.background.blit(surface, (0, self.square_size))
+        self.background.blit(surface, (0, self.square_size * 10))
+        self.background.blit(surface, (self.square_size * 9, self.square_size * 10))
+
+        label = self.header.render("True board state", True, (0, 0, 0))
+        rect = label.get_rect()
+
 
         self.screen.blit(self.background, (0, 0))
         pygame.display.flip()

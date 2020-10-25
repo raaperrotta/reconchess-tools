@@ -18,20 +18,45 @@ for color in chess.COLORS:
         PIECE_IMAGES[piece] = img
 
 
-def draw_empty_board(surface: pygame.Surface, font: pygame.font.SysFont, x, y, w):
-    pygame.draw.rect(surface, LIGHT_COLOR, (x, y, w, w))
+def draw_empty_board(font: pygame.font.SysFont, w) -> pygame.Surface:
+    surface = pygame.Surface((w, w))
+    pygame.draw.rect(surface, LIGHT_COLOR, (0, 0, w, w))
     sw = w / 8
 
     for dark_square in chess.SquareSet(chess.BB_DARK_SQUARES):
-        sx = x + sw * chess.square_file(dark_square)
-        sy = y + sw * chess.square_rank(dark_square)
+        sx = sw * chess.square_file(dark_square)
+        sy = sw * chess.square_rank(dark_square)
         pygame.draw.rect(surface, DARK_COLOR, (sx, sy, sw, sw))
 
     example_label = font.render("a", True, (0, 0, 0))
     rect = example_label.get_rect()
     for i in range(0, 8, 2):
-        surface.blit(font.render(chess.FILE_NAMES[i], True, DARK_COLOR), (x + sw * i, y + w - rect.height))
-        surface.blit(font.render(chess.RANK_NAMES[i], True, LIGHT_COLOR), (x + w - rect.width, y + w - sw - sw * i))
+        surface.blit(font.render(chess.FILE_NAMES[i], True, DARK_COLOR), (sw * i,  w - rect.height))
+        surface.blit(font.render(chess.RANK_NAMES[i], True, LIGHT_COLOR), (w - rect.width, w - sw - sw * i))
     for i in range(1, 8, 2):
-        surface.blit(font.render(chess.FILE_NAMES[i], True, LIGHT_COLOR), (x + sw * i, y + w - rect.height))
-        surface.blit(font.render(chess.RANK_NAMES[i], True, DARK_COLOR), (x + w - rect.width, y + w - sw - sw * i))
+        surface.blit(font.render(chess.FILE_NAMES[i], True, LIGHT_COLOR), (sw * i, w - rect.height))
+        surface.blit(font.render(chess.RANK_NAMES[i], True, DARK_COLOR), (w - rect.width, w - sw - sw * i))
+
+    return surface
+
+
+def draw_pieces(board: chess.Board, w, alpha) -> pygame.Surface:
+    surface = pygame.Surface((w, w), pygame.SRCALPHA)
+    sw = w / 8
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece is not None:
+            image = pygame.transform.scale(PIECE_IMAGES[piece], (int(sw), int(sw)))
+            s = pygame.Surface((sw, sw), pygame.SRCALPHA)
+            s.fill((255, 255, 255, alpha))
+            s.blit(image, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            x = sw * chess.square_file(square)
+            y = sw * chess.square_rank(square)
+            surface.blit(s, (x, y))
+    return surface
+
+
+def draw_board(board: chess.Board, w, alpha, font: pygame.font.SysFont) -> pygame.Surface:
+    surface = draw_empty_board(font, w)
+    surface.blit(draw_pieces(board, w, alpha), (0, 0))
+    return surface
