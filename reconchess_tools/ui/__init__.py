@@ -1,3 +1,6 @@
+from math import sqrt
+from typing import List
+
 import chess
 import pkg_resources
 import pygame
@@ -56,7 +59,9 @@ def draw_pieces(board: chess.Board, w, alpha) -> pygame.Surface:
     return surface
 
 
-def draw_board(board: chess.Board, w, alpha, font: pygame.font.SysFont) -> pygame.Surface:
+def draw_boards(boards: List[chess.Board], w, font: pygame.font.SysFont) -> pygame.Surface:
     surface = draw_empty_board(font, w)
-    surface.blit(draw_pieces(board, w, alpha), (0, 0))
+    alpha = max(1, int(255 / sqrt(len(boards))))
+    for board in boards:
+        surface.blit(draw_pieces(board, w, alpha), (0, 0))
     return surface

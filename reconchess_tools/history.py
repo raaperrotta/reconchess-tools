@@ -61,6 +61,9 @@ class History:
         except StopIteration:
             pass
 
+        self.winner = not board.turn
+        self.win_reason = 'timeout' if board.king(board.turn) else 'king capture'
+
     def __str__(self):
         return f"History({self.history_string})"
 
