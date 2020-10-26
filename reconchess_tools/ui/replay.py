@@ -41,6 +41,8 @@ class Replay:
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.background = pygame.Surface((self.screen.get_size()))
 
+        self.board_surface_cache = {}
+
     def play(self):
         while True:
             self.clock.tick(60)
@@ -63,18 +65,33 @@ class Replay:
 
     def update_view(self):
         self.background.fill(self.background_color)
-        self.background.blit(
-            draw_boards([self.state.true_board], self.square_size * 8, self.board_font),
-            (0, self.square_size)
-        )
-        self.background.blit(
-            draw_boards(self.state.possible_boards_white, self.square_size * 8, self.board_font),
-            (0, self.square_size * 10)
-        )
-        self.background.blit(
-            draw_boards(self.state.possible_boards_black, self.square_size * 8, self.board_font),
-            (self.square_size * 9, self.square_size * 10)
-        )
+
+        key = self.state.true_epd
+        try:
+            surface = self.board_surface_cache[key]
+        except KeyError:
+            surface = self.board_surface_cache[key] = draw_boards(
+                [self.state.true_board], self.square_size * 8, self.board_font
+            )
+        self.background.blit(surface, (0, self.square_size))
+
+        key = "\n".join(self.state.possible_epds_white)
+        try:
+            surface = self.board_surface_cache[key]
+        except KeyError:
+            surface = self.board_surface_cache[key] = draw_boards(
+                self.state.possible_boards_white, self.square_size * 8, self.board_font
+            )
+        self.background.blit(surface, (0, self.square_size * 10))
+
+        key = "\n".join(self.state.possible_epds_black)
+        try:
+            surface = self.board_surface_cache[key]
+        except KeyError:
+            surface = self.board_surface_cache[key] = draw_boards(
+                self.state.possible_boards_black, self.square_size * 8, self.board_font
+            )
+        self.background.blit(surface, (self.square_size * 9, self.square_size * 10))
 
         label = self.header_font.render("True board state", True, self.header_color)
         rect = label.get_rect()
@@ -158,9 +175,12 @@ class State:
         self.action_num = 0
         self.turn = 1
         self.upcoming_action = SENSE
-        self.true_board = chess.Board(self.history.board[self.action_num])
-        self.possible_boards_white = [chess.Board(epd) for epd in self.history.possible_epds[chess.WHITE][self.action_num]]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.history.possible_epds[chess.BLACK][self.action_num]]
+        self.true_epd = self.history.board[self.action_num // 2]
+        self.true_board = chess.Board(self.true_epd)
+        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
+        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
+        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
+        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
 
     def go_to_next_action(self):
         if self.action_num == self.history.num_actions:
@@ -168,9 +188,12 @@ class State:
         self.action_num += 1
         self.turn = self.action_num // 4 + 1
         self.upcoming_action = not self.upcoming_action
-        self.true_board = chess.Board(self.history.board[self.action_num // 2])
-        self.possible_boards_white = [chess.Board(epd) for epd in self.history.possible_epds[chess.WHITE][self.action_num]]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.history.possible_epds[chess.BLACK][self.action_num]]
+        self.true_epd = self.history.board[self.action_num // 2]
+        self.true_board = chess.Board(self.true_epd)
+        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
+        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
+        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
+        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
 
     def go_to_prev_action(self):
         if self.action_num == 0:
@@ -178,9 +201,12 @@ class State:
         self.action_num -= 1
         self.turn = self.action_num // 4 + 1
         self.upcoming_action = not self.upcoming_action
-        self.true_board = chess.Board(self.history.board[self.action_num // 2])
-        self.possible_boards_white = [chess.Board(epd) for epd in self.history.possible_epds[chess.WHITE][self.action_num]]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.history.possible_epds[chess.BLACK][self.action_num]]
+        self.true_epd = self.history.board[self.action_num // 2]
+        self.true_board = chess.Board(self.true_epd)
+        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
+        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
+        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
+        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
 
 
 def _main():
