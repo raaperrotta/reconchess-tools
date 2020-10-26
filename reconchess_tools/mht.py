@@ -37,11 +37,11 @@ class MultiHypothesisTracker:
 
     def op_move(self, capture_square: Optional[chess.Square]):
         new_boards = {}
-        moves = possible_requested_moves(self.boards[0])
-        for board, requested_move in product(self.boards, moves):
-            taken_move, simulated_capture_square = simulate_move(board, requested_move)
-            if simulated_capture_square == capture_square:
-                new_board = board.copy(stack=False)
-                new_board.push(taken_move)
-                new_boards[board_fingerprint(new_board)] = new_board
+        for board in self.boards:
+            for requested_move in possible_requested_moves(board):
+                taken_move, simulated_capture_square = simulate_move(board, requested_move)
+                if simulated_capture_square == capture_square:
+                    new_board = board.copy(stack=False)
+                    new_board.push(taken_move)
+                    new_boards[board_fingerprint(new_board)] = new_board
         self.boards = list(new_boards.values())

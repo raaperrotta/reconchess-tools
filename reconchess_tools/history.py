@@ -24,8 +24,8 @@ class History:
     """
 
     def __init__(self, history_string: str):
-        self.history_string = history_string
         self.history = tuple(history_string.split())
+        self.history_string = " ".join(self.history)
         self.num_actions = len(self.history)
         self.num_moves = self.num_actions // 2
         self.num_moves_by_white = (self.num_moves + 1) // 2
@@ -57,6 +57,7 @@ class History:
                 self.possible_epds[board.turn].append(epds(mhts[board.turn]))
                 self.possible_epds[not board.turn].append(epds(mhts[not board.turn]))
                 board.push(taken_move)
+                self.board.append(epd(board))
 
         except StopIteration:
             pass
