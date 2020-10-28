@@ -109,7 +109,11 @@ class Replay:
         active, waiting = AsyncMultiHypothesisTracker(), AsyncMultiHypothesisTracker()
         turn_index = 0
         num_boards = [1, 1]
+
         requested_move = taken_move = capture_square = piece_moved = piece_captured = None
+        info = []
+        x = y = 10
+        view = self.views[0]
 
         surface_sense = pygame.Surface([self.square_size * 3] * 2, pygame.SRCALPHA)
         surface_sense.fill((205, 205, 255, 85))
@@ -194,7 +198,7 @@ class Replay:
                     f"{num_boards[board.turn]:,.0f} -> {len(active.boards):,.0f} "
                     f"(Δ = {len(active.boards) - num_boards[board.turn]:+,.0f})",
                     "",
-                    f"{chess.COLOR_NAMES[not board.turn].capitalize()} to move on turn {(turn_index + 1) // 2 + 1}",
+                    f"{chess.COLOR_NAMES[board.turn].capitalize()} to move on turn {(turn_index + 1) // 2 + 1}",
                 ]
                 x = y = 10
                 for line in info:
@@ -218,6 +222,15 @@ class Replay:
 
         except StopIteration:
             pass
+
+        info = [
+            "",
+            f"{chess.COLOR_NAMES[self.winner].capitalize()} wins by {self.win_reason}!",
+        ]
+        for line in info:
+            (view.surface_info_after_sense if self.num_actions % 2 else view.surface_info
+             ).blit(self.body_font.render(line, True, self.body_color), (x, y))
+            y += 20
 
     async def respond_to_events(self):
         while True:
@@ -344,6 +357,7 @@ class AsyncMultiHypothesisTracker:
 
 
 async def _main():
+    # replay = Replay("")
     # replay = Replay("00 e2e3 f2 f7f5 c7")
     replay = Replay(
         "00 e2e4 b3 d7d5 g7 g1f3 f2 g8f6 c7 e4d5 c5 d8d5 g7 d2d4 c4 d5a5 d5 b1c3 b4 f6e4 g5 "
