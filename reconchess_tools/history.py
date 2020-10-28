@@ -24,8 +24,10 @@ class History:
     """
 
     def __init__(self, history_string: str):
-        self.history = tuple(history_string.split())
-        self.history_string = " ".join(self.history)
+        self.history = tuple(history_string.strip().split())
+        self.history_string = " ".join(
+            self.history
+        )  # to clean up possible multiple spaces
         self.num_actions = len(self.history)
         self.num_moves = self.num_actions // 2
         self.num_moves_by_white = (self.num_moves + 1) // 2
@@ -48,7 +50,9 @@ class History:
                 result = simulate_sense(board, square)
                 mhts[board.turn].sense(square, result)
                 self.possible_epds[board.turn].append(epds(mhts[board.turn]))
-                self.possible_epds[not board.turn].append(self.possible_epds[not board.turn][-1])
+                self.possible_epds[not board.turn].append(
+                    self.possible_epds[not board.turn][-1]
+                )
                 # Move step
                 requested_move = chess.Move.from_uci(next(history_iter))
                 taken_move, capture_square = simulate_move(board, requested_move)
@@ -63,7 +67,7 @@ class History:
             pass
 
         self.winner = not board.turn
-        self.win_reason = 'timeout' if board.king(board.turn) else 'king capture'
+        self.win_reason = "timeout" if board.king(board.turn) else "king capture"
 
     def __str__(self):
         return f"History({self.history_string})"
@@ -72,7 +76,12 @@ class History:
 def _main():
     history = History("00 e2e3 f2 f7f5 c7 f2f4")
     print(history)
-    print(history.num_actions, history.num_moves, history.num_moves_by_white, history.num_moves_by_black)
+    print(
+        history.num_actions,
+        history.num_moves,
+        history.num_moves_by_white,
+        history.num_moves_by_black,
+    )
     print(history.board[-1])
 
 

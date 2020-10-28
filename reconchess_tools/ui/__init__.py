@@ -14,8 +14,8 @@ for color in chess.COLORS:
     for piece_type in chess.PIECE_TYPES:
         piece = chess.Piece(piece_type, color)
 
-        img_path = 'res/{}/{}.png'.format(chess.COLOR_NAMES[color], piece.symbol())
-        full_path = pkg_resources.resource_filename('reconchess', img_path)
+        img_path = "res/{}/{}.png".format(chess.COLOR_NAMES[color], piece.symbol())
+        full_path = pkg_resources.resource_filename("reconchess", img_path)
 
         img = pygame.image.load(full_path)
         PIECE_IMAGES[piece] = img
@@ -34,11 +34,23 @@ def draw_empty_board(font: pygame.font.SysFont, w) -> pygame.Surface:
     example_label = font.render("a", True, (0, 0, 0))
     rect = example_label.get_rect()
     for i in range(0, 8, 2):
-        surface.blit(font.render(chess.FILE_NAMES[i], True, LIGHT_COLOR), (sw * i,  w - rect.height))
-        surface.blit(font.render(chess.RANK_NAMES[i], True, DARK_COLOR), (w - rect.width, w - sw - sw * i))
+        surface.blit(
+            font.render(chess.FILE_NAMES[i], True, LIGHT_COLOR),
+            (sw * i, w - rect.height),
+        )
+        surface.blit(
+            font.render(chess.RANK_NAMES[i], True, DARK_COLOR),
+            (w - rect.width, w - sw - sw * i),
+        )
     for i in range(1, 8, 2):
-        surface.blit(font.render(chess.FILE_NAMES[i], True, DARK_COLOR), (sw * i, w - rect.height))
-        surface.blit(font.render(chess.RANK_NAMES[i], True, LIGHT_COLOR), (w - rect.width, w - sw - sw * i))
+        surface.blit(
+            font.render(chess.FILE_NAMES[i], True, DARK_COLOR),
+            (sw * i, w - rect.height),
+        )
+        surface.blit(
+            font.render(chess.RANK_NAMES[i], True, LIGHT_COLOR),
+            (w - rect.width, w - sw - sw * i),
+        )
 
     return surface
 
@@ -59,7 +71,9 @@ def draw_pieces(board: chess.Board, w, alpha) -> pygame.Surface:
     return surface
 
 
-def draw_boards(boards: List[chess.Board], w, font: pygame.font.SysFont) -> pygame.Surface:
+def draw_boards(
+    boards: List[chess.Board], w, font: pygame.font.SysFont
+) -> pygame.Surface:
     surface = draw_empty_board(font, w)
     alpha = max(1, int(255 / sqrt(len(boards))))
     for board in boards:

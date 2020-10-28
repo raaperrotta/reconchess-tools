@@ -38,7 +38,12 @@ def simulate_move(board, move: chess.Move) -> Tuple[chess.Move, Optional[int]]:
     if is_illegal_castle(board, move):
         return chess.Move.null(), None
     # if the piece is a sliding piece, slide it as far as it can go
-    if board.piece_at(move.from_square).piece_type in {chess.PAWN, chess.ROOK, chess.BISHOP, chess.QUEEN}:
+    if board.piece_at(move.from_square).piece_type in {
+        chess.PAWN,
+        chess.ROOK,
+        chess.BISHOP,
+        chess.QUEEN,
+    }:
         move = _slide_move(board, move)
         return move, capture_square_of_move(board, move)
     return chess.Move.null(), None

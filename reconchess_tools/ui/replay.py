@@ -1,30 +1,51 @@
+"""Asynchronous pygame UI for displaying each players' MHT view of the game during a replay
+
+Work in progress!
+
+For simplicity, all asynchronous functions are infinite while loops that yield control when
+possible to allow other tasks to run. Information is passed between tasks using queues and by
+updating shared state. The game loop is based on the pygame event loop so the entire process can
+be terminated when that loop returns (e.g. when the user closes the window).
+
+The desired behavior is for the window to appear immediately and for navigation and rendering to
+appear even before the MHT calculations are complete. To accomplish this, we create a surface to
+store each board view and the status computing and rendering the boards. We also store a message
+to be displayed per turn. Then the animation task has only to render the current surfaces at each
+step (and we could possible set a timestamp for the last change to avoid blit-ing unchanged
+surfaces). A separate task runs to compute the MHT views, blit the pieces to each surface,
+and update the status information.
+"""
+
+import asyncio
 import contextlib
+import time
+from typing import List, Optional, Tuple
 
 with contextlib.redirect_stdout(None):
     import pygame
 
 import chess
+from reconchess_tools.utilities import (
+    simulate_sense,
+    simulate_move,
+    possible_requested_moves,
+)
 
-from reconchess_tools.history import History
-
-
-# block output from pygame
-from reconchess_tools.ui import PIECE_IMAGES, draw_boards
+from reconchess_tools.ui import PIECE_IMAGES, draw_boards, draw_empty_board
 
 SENSE, MOVE = False, True
 
 
 class Replay:
-
     def __init__(self, history_string: str):
-        self.state = State(History(history_string))
 
         pygame.init()
-        pygame.display.set_caption('Reconchess MHT Replay')
+        pygame.display.set_caption("Reconchess MHT Replay")
         pygame.display.set_icon(
-            pygame.transform.scale(PIECE_IMAGES[chess.Piece(chess.KING, chess.WHITE)], (32, 32)))
-
-        self.clock = pygame.time.Clock()
+            pygame.transform.scale(
+                PIECE_IMAGES[chess.Piece(chess.KING, chess.WHITE)], (32, 32)
+            )
+        )
 
         self.header_font = pygame.font.SysFont(pygame.font.get_default_font(), 28)
         self.body_font = pygame.font.SysFont(pygame.font.get_default_font(), 20)
@@ -36,183 +57,303 @@ class Replay:
         self.body_color = (160, 160, 160)
 
         self.square_size = 50
-        self.width = self.square_size * 17
-        self.height = self.square_size * 18
+        self.margin = 10
+        self.board_size = self.square_size * 8
+        self.width = self.square_size * 16 + self.margin * 3
+        self.height = self.width
         self.screen = pygame.display.set_mode((self.width, self.height))
-        self.background = pygame.Surface((self.screen.get_size()))
+        self.screen.fill(self.background_color)
 
-        self.board_surface_cache = {}
+        self.action_index = 0
 
-    def play(self):
+        self.history = tuple(history_string.strip().split())
+        self.history_string = " ".join(
+            self.history
+        )  # to clean up possible multiple spaces
+        self.num_actions = len(self.history)
+        self.num_moves = self.num_actions // 2
+        self.num_moves_by_white = (self.num_moves + 1) // 2
+        self.num_moves_by_black = self.num_moves // 2
+
+        board = chess.Board()
+        self.views: List[View] = [View(board, self.board_font, self.board_size)]
+
+        # Compute the true board states synchronously since that is fast
+        history_iter = iter(self.history)
+        try:
+            while True:
+                # Sense step
+                next(history_iter)
+                # Move step
+                requested_move = chess.Move.from_uci(next(history_iter))
+                taken_move, capture_square = simulate_move(board, requested_move)
+                board.push(taken_move)
+                self.views.append(View(board, self.board_font, self.board_size))
+
+        except StopIteration:
+            pass
+
+        self.winner = not board.turn
+        self.win_reason = "timeout" if board.king(board.turn) else "king capture"
+
+    async def play(self):
+        task_mht = asyncio.create_task(self.update_mht())
+        task_update = asyncio.create_task(self.update_view())
+        await self.respond_to_events()
+        task_mht.cancel()
+        task_update.cancel()
+
+    async def update_mht(self):
+        history_iter = iter(self.history)
+        board = chess.Board()
+        active, waiting = AsyncMultiHypothesisTracker(), AsyncMultiHypothesisTracker()
+        turn_index = 0
+        num_boards = [1, 1]
+        requested_move = taken_move = capture_square = piece_moved = piece_captured = None
+
+        surface_sense = pygame.Surface([self.square_size * 3] * 2, pygame.SRCALPHA)
+        surface_sense.fill((205, 205, 255, 85))
+
+        surface_capture = pygame.Surface([self.square_size] * 2, pygame.SRCALPHA)
+        surface_capture.fill((255, 0, 0, 50))
+
+        try:
+            while True:
+                view = self.views[turn_index]
+                if board.turn == chess.WHITE:
+                    view.surface_white = draw_boards(active.boards, self.board_size, self.board_font)
+                    view.surface_black = draw_boards(waiting.boards, self.board_size, self.board_font)
+                else:
+                    view.surface_white = draw_boards(waiting.boards, self.board_size, self.board_font)
+                    view.surface_black = draw_boards(active.boards, self.board_size, self.board_font)
+                # Shade capture square
+                if capture_square is not None:
+                    x = self.square_size * chess.square_file(capture_square)
+                    y = self.board_size - self.square_size * (chess.square_rank(capture_square) + 1)
+                    view.surface_true.blit(surface_capture, (x, y))
+                    view.surface_white.blit(surface_capture, (x, y))
+                    view.surface_black.blit(surface_capture, (x, y))
+                view.updated_at = time.monotonic()
+                await asyncio.sleep(0)
+
+                # Update info
+                view.surface_info.fill(self.background_color)
+                if turn_index == 0:
+                    info = ["White to sense on turn 1"]
+                else:
+                    info = [
+                        f"{chess.COLOR_NAMES[not board.turn].capitalize()} "
+                        f"requested to move {chess.PIECE_NAMES[piece_moved.piece_type]} "
+                        f"{requested_move} on turn "
+                        f"{(turn_index - 1) // 2 + 1}, which",
+                        f"    resulted in move {taken_move} and " +
+                        (f"the capture of the {chess.PIECE_NAMES[piece_captured.piece_type]} at "
+                         f"{chess.SQUARE_NAMES[capture_square]}"
+                         if piece_captured else "no capture"),
+                        f"# possible boards for {chess.COLOR_NAMES[not board.turn]}: "
+                        f"{num_boards[not board.turn]:,.0f} -> {len(waiting.boards):,.0f} "
+                        f"(Δ = {len(waiting.boards) - num_boards[not board.turn]:+,.0f})",
+                        f"# possible boards for {chess.COLOR_NAMES[board.turn]}: "
+                        f"{num_boards[board.turn]:,.0f} -> {len(active.boards):,.0f} "
+                        f"(Δ = {len(active.boards) - num_boards[board.turn]:+,.0f})",
+                        "",
+                        f"{chess.COLOR_NAMES[board.turn].capitalize()} to sense on turn {turn_index // 2 + 1}",
+                    ]
+                x = y = 10
+                for line in info:
+                    view.surface_info.blit(
+                        self.body_font.render(line, True, self.body_color), (x, y)
+                    )
+                    y += 20
+                num_boards[board.turn] = len(active.boards)
+                num_boards[not board.turn] = len(waiting.boards)
+                await asyncio.sleep(0)
+
+                # Sense step
+                square = next(history_iter)
+                square = None if square == "00" else chess.parse_square(square)
+                result = simulate_sense(board, square)
+                active.sense(square, result)
+                view.surface_after_sense = draw_boards(active.boards, self.board_size, self.board_font)
+                # Shade sensed squares
+                if square is not None:
+                    x = self.square_size * (chess.square_file(square) - 1)
+                    y = self.board_size - self.square_size * (chess.square_rank(square) + 2)
+                    view.surface_after_sense.blit(surface_sense, (x, y))
+                view.updated_at = time.monotonic()
+                await asyncio.sleep(0)
+
+                # Update info
+                view.surface_info_after_sense.fill(self.background_color)
+                info = [
+                    f"{chess.COLOR_NAMES[board.turn].capitalize()} " +
+                    (f"sensed at {chess.SQUARE_NAMES[square]}" if square is not None else
+                     "did not sense") +
+                    f" on turn {turn_index // 2 + 1}",
+                    f"# possible boards for {chess.COLOR_NAMES[board.turn]}: "
+                    f"{num_boards[board.turn]:,.0f} -> {len(active.boards):,.0f} "
+                    f"(Δ = {len(active.boards) - num_boards[board.turn]:+,.0f})",
+                    "",
+                    f"{chess.COLOR_NAMES[not board.turn].capitalize()} to move on turn {(turn_index + 1) // 2 + 1}",
+                ]
+                x = y = 10
+                for line in info:
+                    view.surface_info_after_sense.blit(
+                        self.body_font.render(line, True, self.body_color), (x, y)
+                    )
+                    y += 20
+                num_boards[board.turn] = len(active.boards)
+                await asyncio.sleep(0)
+
+                # Move step
+                requested_move = chess.Move.from_uci(next(history_iter))
+                taken_move, capture_square = simulate_move(board, requested_move)
+                piece_moved = board.piece_at(requested_move.from_square) if requested_move else None
+                piece_captured = None if capture_square is None else board.piece_at(capture_square)
+                active.move(requested_move, taken_move, capture_square)
+                await waiting.op_move(capture_square)
+                board.push(taken_move)
+                turn_index += 1
+                active, waiting = waiting, active
+
+        except StopIteration:
+            pass
+
+    async def respond_to_events(self):
         while True:
-            self.clock.tick(60)
-            self.respond_to_events()
-            self.update_view()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_LEFT:
+                        self.action_index = max(0, self.action_index - 1)
+                    elif event.key == pygame.K_RIGHT:
+                        self.action_index = min(self.num_actions, self.action_index + 1)
+                    elif event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        return
+            await asyncio.sleep(0.005)
 
-    def respond_to_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                quit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    self.state.go_to_prev_action()
-                elif event.key == pygame.K_RIGHT:
-                    self.state.go_to_next_action()
-                elif event.key == pygame.K_q:
-                    pygame.quit()
-                    quit()
+    async def update_view(self):
+        dt = 1 / 60
+        actual_fps = 1 / dt
+        alpha = 0.98
+        last_update_time = time.monotonic()
+        while True:
+            view = self.views[self.action_index // 2]
+            surface_true = view.surface_true
+            surface_white = view.surface_white
+            surface_black = view.surface_black
+            surface_info = view.surface_info
+            if self.action_index % 2:  # has sensed
+                surface_info = view.surface_info_after_sense
+                if view.active_player == chess.WHITE:
+                    surface_white = view.surface_after_sense
+                else:
+                    surface_black = view.surface_after_sense
 
-    def update_view(self):
-        self.background.fill(self.background_color)
-
-        key = self.state.true_epd
-        try:
-            surface = self.board_surface_cache[key]
-        except KeyError:
-            surface = self.board_surface_cache[key] = draw_boards(
-                [self.state.true_board], self.square_size * 8, self.board_font
+            self.screen.blit(surface_true, (self.margin, self.margin))
+            self.screen.blit(
+                surface_white,
+                (self.margin, self.margin * 2 + self.square_size * 8),
             )
-        self.background.blit(surface, (0, self.square_size))
-
-        key = "\n".join(self.state.possible_epds_white)
-        try:
-            surface = self.board_surface_cache[key]
-        except KeyError:
-            surface = self.board_surface_cache[key] = draw_boards(
-                self.state.possible_boards_white, self.square_size * 8, self.board_font
+            self.screen.blit(
+                surface_black,
+                (
+                    self.margin * 2 + self.square_size * 8,
+                    self.margin * 2 + self.square_size * 8,
+                ),
             )
-        self.background.blit(surface, (0, self.square_size * 10))
-
-        key = "\n".join(self.state.possible_epds_black)
-        try:
-            surface = self.board_surface_cache[key]
-        except KeyError:
-            surface = self.board_surface_cache[key] = draw_boards(
-                self.state.possible_boards_black, self.square_size * 8, self.board_font
+            self.screen.blit(
+                surface_info, (self.margin * 2 + self.square_size * 8, self.margin)
             )
-        self.background.blit(surface, (self.square_size * 9, self.square_size * 10))
+            pygame.display.flip()
+            current_time = time.monotonic()
+            actual_fps = alpha * actual_fps + (1 - alpha) / (current_time - last_update_time)
+            pygame.display.set_caption(f"Reconchess MHT Replay ({actual_fps:.1f} fps)")
+            await asyncio.sleep(last_update_time + dt - current_time)
+            # await asyncio.sleep(dt)
+            last_update_time = current_time
 
-        label = self.header_font.render("True board state", True, self.header_color)
-        rect = label.get_rect()
-        self.background.blit(label, (
-            int(self.square_size * 4 - rect.width / 2),
-            int(self.square_size * 0.75 - rect.height / 2),
-        ))
 
-        label = f"White sees {len(self.state.possible_boards_white):,.0f} possible board"
-        if len(self.state.possible_boards_white) > 1:
-            label += "s"
-        label = self.header_font.render(label, True, self.header_color)
-        rect = label.get_rect()
-        self.background.blit(label, (
-            int(self.square_size * 4 - rect.width / 2),
-            int(self.square_size * 9.75 - rect.height / 2),
-        ))
+class View:
 
-        label = f"Black sees {len(self.state.possible_boards_black):,.0f} possible board"
-        if len(self.state.possible_boards_black) > 1:
-            label += "s"
-        label = self.header_font.render(label, True, self.header_color)
-        rect = label.get_rect()
-        self.background.blit(label, (
-            int(self.square_size * 13 - rect.width / 2),
-            int(self.square_size * 9.75 - rect.height / 2),
-        ))
+    def __init__(self, true_board, font, width):
+        self.surface_true = draw_boards([true_board], width, font)
+        self.surface_white = draw_empty_board(font, width)
+        self.surface_black = draw_empty_board(font, width)
+        self.surface_after_sense = draw_empty_board(font, width)
+        self.surface_info = pygame.Surface((width, width))
+        self.surface_info_after_sense = pygame.Surface((width, width))
+        self.active_player = true_board.turn
+        self.updated_at = time.monotonic()
 
-        self.update_info()
 
-        self.screen.blit(self.background, (0, 0))
-        pygame.display.flip()
+def board_fingerprint(board: chess.Board):
+    return (
+        board.turn,
+        *board.occupied_co,
+        board.kings,
+        board.queens,
+        board.bishops,
+        board.knights,
+        board.rooks,
+        board.pawns,
+        board.castling_rights,
+        board.ep_square,
+    )
 
-    def update_info(self):
-        x = self.square_size * 9
-        y = self.square_size
 
-        info = [
-            "Game info:",
-            f"    Winner: {chess.COLOR_NAMES[self.state.history.winner]} by {self.state.history.win_reason}",
-            f"    Total actions: {self.state.history.num_actions:,.0f}",
+class AsyncMultiHypothesisTracker:
+
+    def __init__(self):
+        self.boards = [chess.Board()]
+
+    def sense(self, square: chess.Square, result: List[Tuple[int, chess.Piece]]):
+        self.boards = [
+            board for board in self.boards if simulate_sense(board, square) == result
         ]
 
-        info += [
-            "",
-            "Last action:",
+    def move(
+        self,
+        requested_move: chess.Move,
+        taken_move: chess.Move,
+        capture_square: Optional[chess.Square],
+    ):
+        self.boards = [
+            board
+            for board in self.boards
+            if simulate_move(board, requested_move) == (taken_move, capture_square)
         ]
-        if self.state.action_num > 0:
-            if self.state.upcoming_action == SENSE:
-                info.append(f"    Move {(self.state.action_num - 1) // 4 + 1} for "
-                            f"{chess.COLOR_NAMES[not self.state.true_board.turn]}")
-            else:
-                info.append(f"    Sense {(self.state.action_num - 1) // 4 + 1} for "
-                            f"{chess.COLOR_NAMES[self.state.true_board.turn]}")
-            info.append(f"    {self.state.history.history[self.state.action_num - 1]}")
-        else:
-            info += ["    -"] * 2
+        for board in self.boards:
+            board.push(taken_move)
 
-        info += [
-            "",
-            "Upcoming action:",
-            f"    {'Move' if self.state.upcoming_action == MOVE else 'Sense'} {self.state.action_num // 4 + 1} "
-            f"for {chess.COLOR_NAMES[self.state.true_board.turn]}",
-        ]
-        if self.state.action_num == self.state.history.num_actions:
-            info += ["    -"]
-        else:
-            info += [
-                f"    {self.state.history.history[self.state.action_num]}",
-            ]
-
-        for line in info:
-            self.background.blit(self.body_font.render(line, True, self.body_color), (x, y))
-            y += self.body_spacing
+    async def op_move(self, capture_square: Optional[chess.Square]):
+        new_boards = {}
+        for board in self.boards:
+            for requested_move in possible_requested_moves(board):
+                taken_move, simulated_capture_square = simulate_move(
+                    board, requested_move
+                )
+                if simulated_capture_square == capture_square:
+                    new_board = board.copy(stack=False)
+                    new_board.push(taken_move)
+                    new_boards[board_fingerprint(new_board)] = new_board
+            await asyncio.sleep(0)
+        self.boards = list(new_boards.values())
 
 
-class State:
-
-    def __init__(self, history: History):
-        self.history = history
-        self.action_num = 0
-        self.turn = 1
-        self.upcoming_action = SENSE
-        self.true_epd = self.history.board[self.action_num // 2]
-        self.true_board = chess.Board(self.true_epd)
-        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
-        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
-        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
-
-    def go_to_next_action(self):
-        if self.action_num == self.history.num_actions:
-            return
-        self.action_num += 1
-        self.turn = self.action_num // 4 + 1
-        self.upcoming_action = not self.upcoming_action
-        self.true_epd = self.history.board[self.action_num // 2]
-        self.true_board = chess.Board(self.true_epd)
-        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
-        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
-        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
-
-    def go_to_prev_action(self):
-        if self.action_num == 0:
-            return
-        self.action_num -= 1
-        self.turn = self.action_num // 4 + 1
-        self.upcoming_action = not self.upcoming_action
-        self.true_epd = self.history.board[self.action_num // 2]
-        self.true_board = chess.Board(self.true_epd)
-        self.possible_epds_white = self.history.possible_epds[chess.WHITE][self.action_num]
-        self.possible_boards_white = [chess.Board(epd) for epd in self.possible_epds_white]
-        self.possible_epds_black = self.history.possible_epds[chess.BLACK][self.action_num]
-        self.possible_boards_black = [chess.Board(epd) for epd in self.possible_epds_black]
-
-
-def _main():
-    # Replay("00 e2e3 f2 f7f5 c7").play()
-    Replay("00 e2e4 b3 d7d5 g7  g1f3 f2  g8f6 c7  e4d5 c5  d8d5 g7  d2d4 c4  d5a5 d5  b1c3 b4  f6e4 g5  f1b5 e2  b8c6 d7  a2b3 d4  e4c3 d4  b5c6 f3  b7c6 00  b2c3 d2  a5c3 00  c1d2 e2  c3a1 00  d1a1 g2  c8f5 b7  g2h3 d2  a8b8 c4  f3e5 b2  f5c2 c7  a1c3 g2  b8b1 c7  e1e2 d2  c2d1 d2  h1d1 f4  b1d1 00  c3c6 d5 e8d8 e7  c6d7 f2  d1e1 d7  d7d8").play()
+async def _main():
+    # replay = Replay("00 e2e3 f2 f7f5 c7")
+    replay = Replay(
+        "00 e2e4 b3 d7d5 g7 g1f3 f2 g8f6 c7 e4d5 c5 d8d5 g7 d2d4 c4 d5a5 d5 b1c3 b4 f6e4 g5 "
+        "f1b5 e2 b8c6 d7 a2b3 d4 e4c3 d4 b5c6 f3 b7c6 00 b2c3 d2 a5c3 00 c1d2 e2 c3a1 00 d1a1 "
+        "g2 c8f5 b7 g2h3 d2 a8b8 c4 f3e5 b2 f5c2 c7 a1c3 g2 b8b1 c7 e1e2 d2 c2d1 d2 h1d1 f4 "
+        "b1d1 00 c3c6 d5 e8d8 e7 c6d7 f2 d1e1 d7 d7d8"
+    )
+    await replay.play()
+    pygame.quit()  # TODO: Is this necessary?
 
 
 if __name__ == "__main__":
-    _main()
+    asyncio.run(_main())

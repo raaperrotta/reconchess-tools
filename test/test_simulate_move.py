@@ -14,12 +14,15 @@ def run(
     board = chess.Board()
     for move in move_history.split():
         move = chess.Move.from_uci(move)
-        assert move == chess.Move.null() or board.is_pseudo_legal(move), \
-            f"Move history is invalid! Move {move} is not pseudo-legal on board\n{board}"
+        assert move == chess.Move.null() or board.is_pseudo_legal(
+            move
+        ), f"Move history is invalid! Move {move} is not pseudo-legal on board\n{board}"
         board.push(move)
     assert simulate_move(board, chess.Move.from_uci(requested_move)) == (
         chess.Move.from_uci(expected_taken_move),
-        None if expected_capture_square is None else chess.parse_square(expected_capture_square)
+        None
+        if expected_capture_square is None
+        else chess.parse_square(expected_capture_square),
     )
 
 
