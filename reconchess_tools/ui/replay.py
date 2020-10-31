@@ -56,7 +56,7 @@ class Replay:
         self.header_color = (250, 250, 250)
         self.body_color = (160, 160, 160)
 
-        self.square_size = 50
+        self.square_size = 40
         self.margin = 10
         self.board_size = self.square_size * 8
         self.width = self.square_size * 16 + self.margin * 3
@@ -177,7 +177,7 @@ class Replay:
                 square = next(history_iter)
                 square = None if square == "00" else chess.parse_square(square)
                 result = simulate_sense(board, square)
-                active.sense(square, result)
+                await active.sense(square, result)
                 view.surface_after_sense = draw_boards(active.boards, self.board_size, self.board_font)
                 # Shade sensed squares
                 if square is not None:
@@ -214,7 +214,7 @@ class Replay:
                 taken_move, capture_square = simulate_move(board, requested_move)
                 piece_moved = board.piece_at(requested_move.from_square) if requested_move else None
                 piece_captured = None if capture_square is None else board.piece_at(capture_square)
-                active.move(requested_move, taken_move, capture_square)
+                await active.move(requested_move, taken_move, capture_square)
                 await waiting.op_move(capture_square)
                 board.push(taken_move)
                 turn_index += 1
@@ -251,7 +251,7 @@ class Replay:
         dt = 1 / 60
         actual_fps = 1 / dt
         alpha = 0.98
-        last_update_time = time.monotonic()
+        last_update_time = time.time()
         while True:
             view = self.views[self.action_index // 2]
             surface_true = view.surface_true
@@ -281,9 +281,9 @@ class Replay:
                 surface_info, (self.margin * 2 + self.square_size * 8, self.margin)
             )
             pygame.display.flip()
-            current_time = time.monotonic()
-            actual_fps = alpha * actual_fps + (1 - alpha) / (current_time - last_update_time)
-            pygame.display.set_caption(f"Reconchess MHT Replay ({actual_fps:.1f} fps)")
+            current_time = time.time()
+            actual_fps = alpha * actual_fps + (1 - alpha) / max(1e-3, current_time - last_update_time)
+            pygame.display.set_caption(f"Reconchess MHT Replay ({actual_fps:.1f} fps) {current_time}")
             await asyncio.sleep(last_update_time + dt - current_time)
             # await asyncio.sleep(dt)
             last_update_time = current_time
@@ -322,24 +322,27 @@ class AsyncMultiHypothesisTracker:
     def __init__(self):
         self.boards = [chess.Board()]
 
-    def sense(self, square: chess.Square, result: List[Tuple[int, chess.Piece]]):
-        self.boards = [
-            board for board in self.boards if simulate_sense(board, square) == result
-        ]
+    async def sense(self, square: chess.Square, result: List[Tuple[int, chess.Piece]]):
+        new_boards = []
+        for board in self.boards:
+            if simulate_sense(board, square) == result:
+                new_boards.append(board)
+            await asyncio.sleep(0)
+        self.boards = new_boards
 
-    def move(
+    async def move(
         self,
         requested_move: chess.Move,
         taken_move: chess.Move,
         capture_square: Optional[chess.Square],
     ):
-        self.boards = [
-            board
-            for board in self.boards
-            if simulate_move(board, requested_move) == (taken_move, capture_square)
-        ]
+        new_boards = []
         for board in self.boards:
-            board.push(taken_move)
+            if simulate_move(board, requested_move) == (taken_move, capture_square):
+                board.push(taken_move)
+                new_boards.append(board)
+            await asyncio.sleep(0)
+        self.boards = new_boards
 
     async def op_move(self, capture_square: Optional[chess.Square]):
         new_boards = {}
@@ -352,7 +355,7 @@ class AsyncMultiHypothesisTracker:
                     new_board = board.copy(stack=False)
                     new_board.push(taken_move)
                     new_boards[board_fingerprint(new_board)] = new_board
-            await asyncio.sleep(0)
+                await asyncio.sleep(0)
         self.boards = list(new_boards.values())
 
 

@@ -1,4 +1,5 @@
 from math import sqrt
+import random
 from typing import List
 
 import chess
@@ -72,8 +73,10 @@ def draw_pieces(board: chess.Board, w, alpha) -> pygame.Surface:
 
 
 def draw_boards(
-    boards: List[chess.Board], w, font: pygame.font.SysFont
+    boards: List[chess.Board], w, font: pygame.font.SysFont, max_boards = 10_000
 ) -> pygame.Surface:
+    if len(boards) > max_boards:
+        boards = random.sample(boards, max_boards)
     surface = draw_empty_board(font, w)
     alpha = max(1, int(255 / sqrt(len(boards))))
     for board in boards:
