@@ -73,7 +73,7 @@ def draw_pieces(board: chess.Board, w, alpha) -> pygame.Surface:
 
 
 def draw_boards(
-    boards: List[chess.Board], w, font: pygame.font.SysFont, max_boards = 10_000
+    boards: List[chess.Board], w, font: pygame.font.SysFont, max_boards=10_000
 ) -> pygame.Surface:
     if len(boards) > max_boards:
         boards = random.sample(boards, max_boards)

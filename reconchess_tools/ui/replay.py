@@ -11,7 +11,7 @@ The desired behavior is for the window to appear immediately and for navigation 
 appear even before the MHT calculations are complete. To accomplish this, we create a surface to
 store each board view and the status computing and rendering the boards. We also store a message
 to be displayed per turn. Then the animation task has only to render the current surfaces at each
-step (and we could possible set a timestamp for the last change to avoid blit-ing unchanged
+step (and we could possibly set a timestamp for the last change to avoid blit-ing unchanged
 surfaces). A separate task runs to compute the MHT views, blit the pieces to each surface,
 and update the status information.
 """
@@ -102,6 +102,10 @@ class Replay:
         await self.respond_to_events()
         task_mht.cancel()
         task_update.cancel()
+        pygame.quit()
+
+    def play_sync(self):
+        asyncio.run(self.play())
 
     async def update_mht(self):
         history_iter = iter(self.history)
@@ -110,8 +114,9 @@ class Replay:
         turn_index = 0
         num_boards = [1, 1]
 
-        requested_move = taken_move = capture_square = piece_moved = piece_captured = None
-        info = []
+        requested_move = (
+            taken_move
+        ) = capture_square = piece_moved = piece_captured = None
         x = y = 10
         view = self.views[0]
 
@@ -121,19 +126,30 @@ class Replay:
         surface_capture = pygame.Surface([self.square_size] * 2, pygame.SRCALPHA)
         surface_capture.fill((255, 0, 0, 50))
 
+        # TODO: Split white and black MHT views in case one explodes
         try:
             while True:
                 view = self.views[turn_index]
                 if board.turn == chess.WHITE:
-                    view.surface_white = draw_boards(active.boards, self.board_size, self.board_font)
-                    view.surface_black = draw_boards(waiting.boards, self.board_size, self.board_font)
+                    view.surface_white = draw_boards(
+                        active.boards, self.board_size, self.board_font
+                    )
+                    view.surface_black = draw_boards(
+                        waiting.boards, self.board_size, self.board_font
+                    )
                 else:
-                    view.surface_white = draw_boards(waiting.boards, self.board_size, self.board_font)
-                    view.surface_black = draw_boards(active.boards, self.board_size, self.board_font)
+                    view.surface_white = draw_boards(
+                        waiting.boards, self.board_size, self.board_font
+                    )
+                    view.surface_black = draw_boards(
+                        active.boards, self.board_size, self.board_font
+                    )
                 # Shade capture square
                 if capture_square is not None:
                     x = self.square_size * chess.square_file(capture_square)
-                    y = self.board_size - self.square_size * (chess.square_rank(capture_square) + 1)
+                    y = self.board_size - self.square_size * (
+                        chess.square_rank(capture_square) + 1
+                    )
                     view.surface_true.blit(surface_capture, (x, y))
                     view.surface_white.blit(surface_capture, (x, y))
                     view.surface_black.blit(surface_capture, (x, y))
@@ -150,10 +166,13 @@ class Replay:
                         f"requested to move {chess.PIECE_NAMES[piece_moved.piece_type]} "
                         f"{requested_move} on turn "
                         f"{(turn_index - 1) // 2 + 1}, which",
-                        f"    resulted in move {taken_move} and " +
-                        (f"the capture of the {chess.PIECE_NAMES[piece_captured.piece_type]} at "
-                         f"{chess.SQUARE_NAMES[capture_square]}"
-                         if piece_captured else "no capture"),
+                        f"    resulted in move {taken_move} and "
+                        + (
+                            f"the capture of the {chess.PIECE_NAMES[piece_captured.piece_type]} at "
+                            f"{chess.SQUARE_NAMES[capture_square]}"
+                            if piece_captured
+                            else "no capture"
+                        ),
                         f"# possible boards for {chess.COLOR_NAMES[not board.turn]}: "
                         f"{num_boards[not board.turn]:,.0f} -> {len(waiting.boards):,.0f} "
                         f"(Δ = {len(waiting.boards) - num_boards[not board.turn]:+,.0f})",
@@ -178,11 +197,15 @@ class Replay:
                 square = None if square == "00" else chess.parse_square(square)
                 result = simulate_sense(board, square)
                 await active.sense(square, result)
-                view.surface_after_sense = draw_boards(active.boards, self.board_size, self.board_font)
+                view.surface_after_sense = draw_boards(
+                    active.boards, self.board_size, self.board_font
+                )
                 # Shade sensed squares
                 if square is not None:
                     x = self.square_size * (chess.square_file(square) - 1)
-                    y = self.board_size - self.square_size * (chess.square_rank(square) + 2)
+                    y = self.board_size - self.square_size * (
+                        chess.square_rank(square) + 2
+                    )
                     view.surface_after_sense.blit(surface_sense, (x, y))
                 view.updated_at = time.monotonic()
                 await asyncio.sleep(0)
@@ -190,10 +213,13 @@ class Replay:
                 # Update info
                 view.surface_info_after_sense.fill(self.background_color)
                 info = [
-                    f"{chess.COLOR_NAMES[board.turn].capitalize()} " +
-                    (f"sensed at {chess.SQUARE_NAMES[square]}" if square is not None else
-                     "did not sense") +
-                    f" on turn {turn_index // 2 + 1}",
+                    f"{chess.COLOR_NAMES[board.turn].capitalize()} "
+                    + (
+                        f"sensed at {chess.SQUARE_NAMES[square]}"
+                        if square is not None
+                        else "did not sense"
+                    )
+                    + f" on turn {turn_index // 2 + 1}",
                     f"# possible boards for {chess.COLOR_NAMES[board.turn]}: "
                     f"{num_boards[board.turn]:,.0f} -> {len(active.boards):,.0f} "
                     f"(Δ = {len(active.boards) - num_boards[board.turn]:+,.0f})",
@@ -212,8 +238,14 @@ class Replay:
                 # Move step
                 requested_move = chess.Move.from_uci(next(history_iter))
                 taken_move, capture_square = simulate_move(board, requested_move)
-                piece_moved = board.piece_at(requested_move.from_square) if requested_move else None
-                piece_captured = None if capture_square is None else board.piece_at(capture_square)
+                piece_moved = (
+                    board.piece_at(requested_move.from_square)
+                    if requested_move
+                    else None
+                )
+                piece_captured = (
+                    None if capture_square is None else board.piece_at(capture_square)
+                )
                 await active.move(requested_move, taken_move, capture_square)
                 await waiting.op_move(capture_square)
                 board.push(taken_move)
@@ -228,8 +260,11 @@ class Replay:
             f"{chess.COLOR_NAMES[self.winner].capitalize()} wins by {self.win_reason}!",
         ]
         for line in info:
-            (view.surface_info_after_sense if self.num_actions % 2 else view.surface_info
-             ).blit(self.body_font.render(line, True, self.body_color), (x, y))
+            (
+                view.surface_info_after_sense
+                if self.num_actions % 2
+                else view.surface_info
+            ).blit(self.body_font.render(line, True, self.body_color), (x, y))
             y += 20
 
     async def respond_to_events(self):
@@ -282,15 +317,16 @@ class Replay:
             )
             pygame.display.flip()
             current_time = time.time()
-            actual_fps = alpha * actual_fps + (1 - alpha) / max(1e-3, current_time - last_update_time)
-            pygame.display.set_caption(f"Reconchess MHT Replay ({actual_fps:.1f} fps) {current_time}")
+            actual_fps = alpha * actual_fps + (1 - alpha) / max(
+                1e-3, current_time - last_update_time
+            )
+            pygame.display.set_caption(f"Reconchess MHT Replay ({actual_fps:.1f} fps)")
             await asyncio.sleep(last_update_time + dt - current_time)
             # await asyncio.sleep(dt)
             last_update_time = current_time
 
 
 class View:
-
     def __init__(self, true_board, font, width):
         self.surface_true = draw_boards([true_board], width, font)
         self.surface_white = draw_empty_board(font, width)
@@ -318,7 +354,6 @@ def board_fingerprint(board: chess.Board):
 
 
 class AsyncMultiHypothesisTracker:
-
     def __init__(self):
         self.boards = [chess.Board()]
 
@@ -359,7 +394,7 @@ class AsyncMultiHypothesisTracker:
         self.boards = list(new_boards.values())
 
 
-async def _main():
+def _main():
     # replay = Replay("")
     # replay = Replay("00 e2e3 f2 f7f5 c7")
     replay = Replay(
@@ -368,9 +403,8 @@ async def _main():
         "g2 c8f5 b7 g2h3 d2 a8b8 c4 f3e5 b2 f5c2 c7 a1c3 g2 b8b1 c7 e1e2 d2 c2d1 d2 h1d1 f4 "
         "b1d1 00 c3c6 d5 e8d8 e7 c6d7 f2 d1e1 d7 d7d8"
     )
-    await replay.play()
-    pygame.quit()  # TODO: Is this necessary?
+    replay.play_sync()
 
 
 if __name__ == "__main__":
-    asyncio.run(_main())
+    _main()
