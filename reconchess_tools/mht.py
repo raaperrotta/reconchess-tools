@@ -34,6 +34,9 @@ class MultiHypothesisTracker:
         #    the sense result.
         #  - Have existing methods do a lookup on speculation results if present, then delete them
 
+    def reset(self):
+        self.boards = [chess.Board()]
+
     def sense(self, square: chess.Square, result: List[Tuple[int, chess.Piece]]):
         result = set(result)  # make order-independent
         self.boards = [
