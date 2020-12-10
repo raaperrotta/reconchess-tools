@@ -1,7 +1,9 @@
+from collections import defaultdict
 from typing import List, Tuple, Optional
 
 import chess
 
+from reconchess_tools.strategy import SENSE_SQUARES
 from reconchess_tools.utilities import (
     simulate_sense,
     simulate_move,
@@ -28,6 +30,9 @@ class MultiHypothesisTracker:
     def __init__(self):
         self.boards = [chess.Board()]
 
+        # An optional nested map of subsequent boards given a sense square and sense result
+        self.sense_speculation = None
+
         # TODO speculation
         #  - For each of move and sense, add a method to calculate all possible outcomes without the
         #    prior information. For sense, without the opponent's capture square. For move, without
@@ -37,13 +42,23 @@ class MultiHypothesisTracker:
     def reset(self):
         self.boards = [chess.Board()]
 
-    def sense(self, square: chess.Square, result: List[Tuple[int, chess.Piece]]):
-        result = set(result)  # make order-independent
-        self.boards = [
-            board
-            for board in self.boards
-            if set(simulate_sense(board, square)) == result
-        ]
+    def speculate_sense(self, sense_squares=SENSE_SQUARES):
+        self.sense_speculation = {}
+        for square in sense_squares:
+            self.sense_speculation[square] = sense_results = defaultdict(list)
+            for board in self.boards:
+                sense_results[tuple(simulate_sense(board, square))].append(board)
+
+    def sense(self, square: chess.Square, sorted_result: List[Tuple[int, chess.Piece]]):
+        if self.sense_speculation is not None:
+            self.boards = self.sense_speculation[square][tuple(sorted_result)]
+            self.sense_speculation = None
+        else:
+            self.boards = [
+                board
+                for board in self.boards
+                if simulate_sense(board, square) == sorted_result
+            ]
 
     def move(
         self,

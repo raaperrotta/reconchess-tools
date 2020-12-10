@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from reconchess_tools.mht import MultiHypothesisTracker
 from reconchess_tools.stockfish import create_engine
-from reconchess_tools.strategy import non_dominated_sense, certain_win
+from reconchess_tools.strategy import certain_win, minimax_sense, non_dominated_sense_by_own_pieces
 from reconchess_tools.utilities import simulate_move
 
 
@@ -62,6 +62,8 @@ class MhtBot(Player):
         move_actions: List[chess.Move],
         seconds_left: float,
     ) -> Optional[chess.Square]:
+        if not self.mht.boards:
+            return None
         # You can think of the choice of a sense square as a partition of the possible boards, where
         # possible boards are equivalent if the sense result centered on that square is the same. As
         # such, it is possible to identify choices that are dominated (they can't possibly yield
@@ -70,7 +72,8 @@ class MhtBot(Player):
         # based on the partitions. For convenience, the following function recommends the square
         # whose biggest partition is smallest (the minimax remaining number of boards after the
         # hypothetical sense step).
-        _, minimax_square = non_dominated_sense(self.mht.boards)
+        self.mht.speculate_sense(non_dominated_sense_by_own_pieces(self.mht.boards[0]))
+        minimax_square = minimax_sense(self.mht.sense_speculation)
         return minimax_square
 
     def handle_sense_result(
@@ -80,12 +83,13 @@ class MhtBot(Player):
             # The sense target is just the middle of the list when in sorted order. Note that the
             # sense result from our simulate_sense utility and from the reconchess LocalGame are
             # already in sorted order, but that sense results from server games will not necessarily
-            # be sorted.
-            sense_result = sorted((s, p) for s, p in sense_result)
-            square = sense_result[4][0]
+            # be sorted. Also, the square, piece pairs are tuples except in server games, in which
+            # case they are lists and we convert them to tuples here.
+            sorted_result = sorted((s, p) for s, p in sense_result)
+            square = sorted_result[4][0]
             # Here we filter the list of possible boards to include only those that match over the
             # sensed region.
-            self.mht.sense(square, sense_result)
+            self.mht.sense(square, sorted_result)
 
     def choose_move(
         self, move_actions: List[chess.Move], seconds_left: float

@@ -1,14 +1,13 @@
 from collections import defaultdict
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
 
 import chess
 
-
-# Sensing on the edge of the board is never a good idea
 from reconchess.utilities import move_actions, revise_move
 
 from reconchess_tools.utilities import simulate_sense, simulate_move
 
+# Sensing on the edge of the board is never a good idea
 SENSE_SQUARES = [
     9,
     10,
@@ -72,47 +71,31 @@ def certain_win(boards: List[chess.Board]) -> Optional[chess.Move]:
             return requested_move
 
 
-def non_dominated_sense(boards):
-    # TODO separate this to make it easier to get minimax square alone when desired
+def minimax_sense(sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]):
+    return min(
+        sense_results_for_square.items(),
+        key=lambda x: max(len(group) for group in x[1].values())
+    )[0]
 
-    if len(boards) <= 1:
-        return {None}, None
 
-    screened_sense_actions = _non_dominated_sense_helper(boards[0])
-
-    dominated_senses = set()
-    sense_results_for_square = {}
-
-    for square in screened_sense_actions:
-        sense_results_for_square[square] = sense_results = defaultdict(list)
-        for board in boards:
-            sense_results[tuple(simulate_sense(board, square))].append(id(board))
-
+def non_dominated_sense(sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]):
     # a square is dominated if every group in its groups is a superset of some group of the dominating square
-    for square in screened_sense_actions:
-        sense_results = sense_results_for_square[square]
-        groups = [set(v) for v in sense_results.values()]
+    dominated_senses = set()
+    for square, sense_results in sense_results_for_square.items():
+        # Assume equal boards are identical objects as they are with mht.speculate_sense. This leads
+        # to drastically faster comparisons than if we had to check the boards for equality.
+        groups = [set(id(board) for board in v) for v in sense_results.values()]
         for square2, sense_results2 in sense_results_for_square.items():
             if square2 in dominated_senses or square2 == square:
                 continue
-            groups2 = [set(v) for v in sense_results2.values()]
+            groups2 = [set(id(board) for board in v) for v in sense_results2.values()]
             if all(any(g.issuperset(g2) for g2 in groups2) for g in groups):
                 dominated_senses.add(square)
                 break
-
-    out = set(screened_sense_actions) - dominated_senses
-    # compute the minimax sense here in case we need it
-    minimax_square = min(
-        out,
-        key=lambda sq: max(
-            len(group) for group in sense_results_for_square[sq].values()
-        ),
-    )
-
-    return out, minimax_square
+    return set(sense_results_for_square.keys()) - dominated_senses
 
 
-def _non_dominated_sense_helper(board):
+def non_dominated_sense_by_own_pieces(board):
     """Screen sense squares that are trivially dominated because of my own piece positions"""
     actions = []
     for square in SENSE_SQUARES:

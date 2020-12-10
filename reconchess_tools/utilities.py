@@ -20,7 +20,7 @@ def simulate_sense(
     assert square in list(chess.SQUARES), f"{square} is not a valid square."
     rank, file = chess.square_rank(square), chess.square_file(square)
     sense_result = []
-    for delta_rank in [1, 0, -1]:
+    for delta_rank in [-1, 0, 1]:
         for delta_file in [-1, 0, 1]:
             if 0 <= rank + delta_rank <= 7 and 0 <= file + delta_file <= 7:
                 sense_square = chess.square(file + delta_file, rank + delta_rank)
