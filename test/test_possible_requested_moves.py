@@ -7,9 +7,13 @@ def run(move_history: str, expected: str):
     board = chess.Board()
     for move in move_history.split():
         board.push(chess.Move.from_uci(move))
-    assert set(possible_requested_moves(board)) == {
-        chess.Move.from_uci(move) for move in expected.split()
-    }
+    moves_under_test = set(possible_requested_moves(board))
+    expected_moves = {chess.Move.from_uci(move) for move in expected.split()}
+    extra = moves_under_test - expected_moves
+    missing = expected_moves - moves_under_test
+    assert extra == set(), f"Included these extra moves {[m.uci() for m in extra]}"
+    assert missing == set(), f"Missing these expected moves {[m.uci() for m in missing]}"
+    assert moves_under_test == expected_moves
 
 
 def test_opening_moves_for_white():
