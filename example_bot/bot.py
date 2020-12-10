@@ -8,7 +8,11 @@ from tqdm import tqdm
 
 from reconchess_tools.mht import MultiHypothesisTracker
 from reconchess_tools.stockfish import create_engine
-from reconchess_tools.strategy import certain_win, minimax_sense, non_dominated_sense_by_own_pieces
+from reconchess_tools.strategy import (
+    certain_win,
+    minimax_sense,
+    non_dominated_sense_by_own_pieces,
+)
 from reconchess_tools.utilities import simulate_move
 
 

@@ -64,6 +64,7 @@ class MultiHypothesisTracker:
     results. The sense_speculation property can be input to various functions in the strategy module
     to aid sense decision making. It is reset to None after it is used in the sense step.
     """
+
     def __init__(self):
         self.boards = [chess.Board()]
 

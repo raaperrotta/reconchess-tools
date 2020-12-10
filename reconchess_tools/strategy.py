@@ -1,11 +1,9 @@
-from collections import defaultdict
 from typing import List, Optional, Dict, Tuple
 
 import chess
-
 from reconchess.utilities import move_actions, revise_move
 
-from reconchess_tools.utilities import simulate_sense, simulate_move
+from reconchess_tools.utilities import simulate_move
 
 # Sensing on the edge of the board is never a good idea
 SENSE_SQUARES = [
@@ -71,14 +69,18 @@ def certain_win(boards: List[chess.Board]) -> Optional[chess.Move]:
             return requested_move
 
 
-def minimax_sense(sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]):
+def minimax_sense(
+    sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]
+):
     return min(
         sense_results_for_square.items(),
-        key=lambda x: max(len(group) for group in x[1].values())
+        key=lambda x: max(len(group) for group in x[1].values()),
     )[0]
 
 
-def non_dominated_sense(sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]):
+def non_dominated_sense(
+    sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]
+):
     # a square is dominated if every group in its groups is a superset of some group of the dominating square
     dominated_senses = set()
     for square, sense_results in sense_results_for_square.items():

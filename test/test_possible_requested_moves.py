@@ -12,7 +12,9 @@ def run(move_history: str, expected: str):
     extra = moves_under_test - expected_moves
     missing = expected_moves - moves_under_test
     assert extra == set(), f"Included these extra moves {[m.uci() for m in extra]}"
-    assert missing == set(), f"Missing these expected moves {[m.uci() for m in missing]}"
+    assert (
+        missing == set()
+    ), f"Missing these expected moves {[m.uci() for m in missing]}"
     assert moves_under_test == expected_moves
 
 
