@@ -14,7 +14,7 @@ _BACKRANK_SQUARES = chess.SquareSet(chess.BB_BACKRANKS)
 
 def simulate_sense(
     board: chess.Board, square: Optional[chess.Square]
-) -> List[Tuple[int, chess.Piece]]:
+) -> List[Tuple[chess.Square, Optional[chess.Piece]]]:
     if square is None:
         return []
     assert square in list(chess.SQUARES), f"{square} is not a valid square."

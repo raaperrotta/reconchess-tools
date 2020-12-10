@@ -7,42 +7,9 @@ from reconchess_tools.utilities import simulate_move
 
 # Sensing on the edge of the board is never a good idea
 SENSE_SQUARES = [
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    17,
-    18,
-    19,
-    20,
-    21,
-    22,
-    25,
-    26,
-    27,
-    28,
-    29,
-    30,
-    33,
-    34,
-    35,
-    36,
-    37,
-    38,
-    41,
-    42,
-    43,
-    44,
-    45,
-    46,
-    49,
-    50,
-    51,
-    52,
-    53,
-    54,
+    square
+    for square in chess.SQUARES
+    if 0 < chess.square_file(square) < 7 and 0 < chess.square_rank(square) < 7
 ]
 
 
@@ -72,6 +39,11 @@ def certain_win(boards: List[chess.Board]) -> Optional[chess.Move]:
 def minimax_sense(
     sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]
 ):
+    """Find the minimax sense square
+
+    Returns the square for which the worst case number of boards remaining after sensing there is
+    the smallest.
+    """
     return min(
         sense_results_for_square.items(),
         key=lambda x: max(len(group) for group in x[1].values()),
