@@ -8,7 +8,11 @@ from tqdm import tqdm
 
 from reconchess_tools.mht import MultiHypothesisTracker
 from reconchess_tools.stockfish import create_engine
-from reconchess_tools.strategy import certain_win, minimax_sense, non_dominated_sense_by_own_pieces
+from reconchess_tools.strategy import (
+    certain_win,
+    minimax_sense,
+    non_dominated_sense_by_own_pieces,
+)
 from reconchess_tools.utilities import simulate_move
 
 
@@ -64,14 +68,14 @@ class MhtBot(Player):
     ) -> Optional[chess.Square]:
         if not self.mht.boards:
             return None
-        # You can think of the choice of a sense square as a partition of the possible boards, where
-        # possible boards are equivalent if the sense result centered on that square is the same. As
-        # such, it is possible to identify choices that are dominated (they can't possibly yield
-        # information that would not be revealed by the dominating choice) in terms of these
-        # partitions. Additionally, it is easy to write simple logic to recommend a sense choice
-        # based on the partitions. For convenience, the following function recommends the square
-        # whose biggest partition is smallest (the minimax remaining number of boards after the
-        # hypothetical sense step).
+        # You can think of the choice of a sense square as a partition of the possible boards,
+        # where possible boards are equivalent if the sense result centered on that square is the
+        # same. As such, it is possible to identify choices that are dominated (they can't
+        # possibly yield information that would not be revealed by the dominating choice) in
+        # terms of these partitions. Additionally, it is easy to write simple logic to recommend
+        # a sense choice based on the partitions. For example, the following function recommends
+        # the square whose biggest partition is smallest (the minimax remaining number of boards
+        # after the hypothetical sense step).
         self.mht.speculate_sense(non_dominated_sense_by_own_pieces(self.mht.boards[0]))
         minimax_square = minimax_sense(self.mht.sense_speculation)
         return minimax_square
