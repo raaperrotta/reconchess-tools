@@ -20,10 +20,4 @@ if __name__ == "__main__":
     print("Game Over!")
     print(f"Winner: {winner}! ({win_reason})")
 
-    actions = []
-    for turn in history.turns():
-        sense = history.sense(turn)
-        actions.append("00" if sense is None else chess.SQUARE_NAMES[sense])
-        actions.append((history.requested_move(turn) or chess.Move.null()).uci())
-    actions = " ".join(actions)
-    Replay(actions).play_sync()
+    Replay.from_history(history).play_sync()

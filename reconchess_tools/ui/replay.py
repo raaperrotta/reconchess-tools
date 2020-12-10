@@ -21,6 +21,8 @@ import contextlib
 import time
 from typing import List, Optional, Tuple
 
+from reconchess import GameHistory
+
 with contextlib.redirect_stdout(None):
     import pygame
 
@@ -95,6 +97,16 @@ class Replay:
 
         self.winner = not board.turn
         self.win_reason = "timeout" if board.king(board.turn) else "king capture"
+
+    @classmethod
+    def from_history(cls, history: GameHistory) -> "Replay":
+        actions = []
+        for turn in history.turns():
+            sense = history.sense(turn)
+            actions.append("00" if sense is None else chess.SQUARE_NAMES[sense])
+            actions.append((history.requested_move(turn) or chess.Move.null()).uci())
+        actions = " ".join(actions)
+        return Replay(actions)
 
     async def play(self):
         task_mht = asyncio.create_task(self.update_mht())
