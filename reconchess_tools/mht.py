@@ -71,6 +71,10 @@ class MultiHypothesisTracker:
         # An optional nested map of subsequent boards given a sense square and sense result
         self.sense_speculation = None
 
+        # An optional tuple of moves and nested list taken_move and capture square such that
+        # move_speculation[1][i][j] is the result of move_speculation[0][j] on board[i]
+        self.move_speculation = None
+
         # TODO speculation
         #  - For each of my move and opponent move, add a method to calculate all possible outcomes
         #    without the prior information.
@@ -86,6 +90,15 @@ class MultiHypothesisTracker:
             for board in self.boards:
                 sense_results[tuple(simulate_sense(board, square))].append(board)
 
+    def speculate_move(self, moves: List[chess.Move]):
+        all_move_results = []
+        self.move_speculation = moves, all_move_results
+        for board in self.boards:
+            move_results = []
+            for requested_move in moves:
+                move_results.append(simulate_move(board, requested_move))
+            all_move_results.append(move_results)
+
     def sense(self, square: chess.Square, sorted_result: List[Tuple[int, chess.Piece]]):
         if self.sense_speculation is not None:
             self.boards = self.sense_speculation[square][tuple(sorted_result)]
@@ -96,17 +109,21 @@ class MultiHypothesisTracker:
                 for board in self.boards
                 if simulate_sense(board, square) == sorted_result
             ]
+        # TODO filter move_speculation if present
 
     def move(
         self,
         requested_move: chess.Move,
         taken_move: chess.Move,
         capture_square: Optional[chess.Square],
+        include_king_captures: bool = True,
     ):
+        # TODO use move_speculation if present
         self.boards = [
             board
             for board in self.boards
             if simulate_move(board, requested_move) == (taken_move, capture_square)
+            and (include_king_captures or capture_square != board.king(not board.turn))
         ]
         for board in self.boards:
             board.push(taken_move)

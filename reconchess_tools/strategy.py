@@ -37,7 +37,7 @@ def certain_win(boards: List[chess.Board]) -> Optional[chess.Move]:
 
 
 def minimax_sense(
-    sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]
+    sense_results_for_square: Dict[chess.Square, Dict[Tuple, List[chess.Board]]]
 ):
     """Find the minimax sense square
 
@@ -51,7 +51,7 @@ def minimax_sense(
 
 
 def non_dominated_sense(
-    sense_results_for_square: Dict[chess.Square, Dict[Tuple, chess.Board]]
+    sense_results_for_square: Dict[chess.Square, Dict[Tuple, List[chess.Board]]]
 ):
     # a square is dominated if every group in its groups is a superset of some group of the dominating square
     dominated_senses = set()
