@@ -1,16 +1,16 @@
 import chess
 import reconchess
-from reconchess.bots.trout_bot import TroutBot
 
 from example_bot.bot import MhtBot
 from reconchess_tools.ui.replay import Replay
+from sac.bot import SacBot
 
 if __name__ == "__main__":
 
     game = reconchess.LocalGame(900)
 
-    white = TroutBot()
-    black = MhtBot()
+    white = MhtBot()
+    black = SacBot(None, None, None, None)
 
     winner_color, win_reason, history = reconchess.play_local_game(
         white, black, game=game
