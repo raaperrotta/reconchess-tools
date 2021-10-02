@@ -1,5 +1,5 @@
 click==7.1.2
 pygame==2.0.0.dev22
 python-chess==1.2.0
-reconchess @ git+https://github.com/reconnaissanceblindchess/reconchess@96c7cbaee9351ddf7eccd1334a6f23ff10d2bfe8
+reconchess>=1.6.8
 tqdm==4.54.1

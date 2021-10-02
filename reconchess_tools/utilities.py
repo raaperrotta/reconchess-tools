@@ -1,11 +1,11 @@
-from typing import Tuple, List, Optional, Iterable
+from typing import Iterable, List, Optional, Tuple
 
 import chess
 from reconchess.utilities import (
-    is_illegal_castle,
     capture_square_of_move,
-    revise_move,
+    is_illegal_castle,
     move_actions,
+    revise_move,
     without_opponent_pieces,
 )
 

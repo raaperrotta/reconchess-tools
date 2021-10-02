@@ -1,11 +1,10 @@
-from math import sqrt
 import random
+from math import sqrt
 from typing import List
 
 import chess
 import pkg_resources
 import pygame
-
 
 LIGHT_COLOR = (240, 217, 181)
 DARK_COLOR = (181, 136, 99)

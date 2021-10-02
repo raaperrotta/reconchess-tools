@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import chess
 from reconchess.utilities import move_actions, revise_move

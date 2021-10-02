@@ -27,13 +27,13 @@ with contextlib.redirect_stdout(None):
     import pygame
 
 import chess
-from reconchess_tools.utilities import (
-    simulate_sense,
-    simulate_move,
-    possible_requested_moves,
-)
 
 from reconchess_tools.ui import PIECE_IMAGES, draw_boards, draw_empty_board
+from reconchess_tools.utilities import (
+    possible_requested_moves,
+    simulate_move,
+    simulate_sense,
+)
 
 SENSE, MOVE = False, True
 
@@ -68,7 +68,7 @@ class Replay:
 
         self.action_index = 0
 
-        self.history = tuple(history_string.strip().split())
+        self.history = tuple(history_string.strip().lower().split())
         self.history_string = " ".join(
             self.history
         )  # to clean up possible multiple spaces
@@ -407,15 +407,11 @@ class AsyncMultiHypothesisTracker:
 
 
 def _main():
-    # replay = Replay("")
-    # replay = Replay("00 e2e3 f2 f7f5 c7")
-    replay = Replay(
-        "00 e2e4 b3 d7d5 g7 g1f3 f2 g8f6 c7 e4d5 c5 d8d5 g7 d2d4 c4 d5a5 d5 b1c3 b4 f6e4 g5 "
-        "f1b5 e2 b8c6 d7 a2b3 d4 e4c3 d4 b5c6 f3 b7c6 00 b2c3 d2 a5c3 00 c1d2 e2 c3a1 00 d1a1 "
-        "g2 c8f5 b7 g2h3 d2 a8b8 c4 f3e5 b2 f5c2 c7 a1c3 g2 b8b1 c7 e1e2 d2 c2d1 d2 h1d1 f4 "
-        "b1d1 00 c3c6 d5 e8d8 e7 c6d7 f2 d1e1 d7 d7d8"
-    )
-    replay.play_sync()
+    Replay(
+        """
+        E6 e2e4 E3 c7c6 G7 d2d4 D2 d8b6 C5 b1c3 B2 b6b4 B4 g1f3 B2 d7d5 C7 a2a3 B4 b4a5 E7 a3b4 C4 b8d7 F3 a3b4 E2 a5a6 B3 c3b5 C2 a6a5 B7 b5c7 G2 a5e1
+        """
+    ).play_sync()
 
 
 if __name__ == "__main__":
