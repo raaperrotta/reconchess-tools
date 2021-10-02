@@ -1,13 +1,13 @@
 from collections import defaultdict
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import chess
 
 from reconchess_tools.strategy import SENSE_SQUARES
 from reconchess_tools.utilities import (
-    simulate_sense,
-    simulate_move,
     possible_requested_moves,
+    simulate_move,
+    simulate_sense,
 )
 
 

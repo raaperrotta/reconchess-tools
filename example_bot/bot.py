@@ -1,9 +1,9 @@
 import random
 from collections import defaultdict
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import chess.engine
-from reconchess import Player, Color, WinReason, GameHistory
+from reconchess import Color, GameHistory, Player, WinReason
 from tqdm import tqdm
 
 from reconchess_tools.mht import MultiHypothesisTracker

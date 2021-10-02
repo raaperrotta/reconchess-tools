@@ -2,7 +2,7 @@ import random
 from time import perf_counter
 
 import chess
-from reconchess.utilities import revise_move, move_actions
+from reconchess.utilities import move_actions, revise_move
 from tqdm import trange
 
 

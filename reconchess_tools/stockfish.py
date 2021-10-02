@@ -2,7 +2,6 @@ import os
 
 import chess.engine
 
-
 # make sure stockfish environment variable exists
 if "STOCKFISH_EXECUTABLE" not in os.environ:
     raise KeyError(
