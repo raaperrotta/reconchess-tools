@@ -2,7 +2,7 @@ import chess
 import reconchess
 from reconchess.bots.trout_bot import TroutBot
 
-from example_bot.bot import MhtBot
+from reconchess_tools.example_bot.bot import MhtBot
 
 
 def play(p1, p2):
