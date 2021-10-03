@@ -10,12 +10,13 @@ URL = "https://github.com/raaperrotta/reconchess-tools"
 EMAIL = "raaperrotta@gmail.com"
 AUTHOR = "Robert Perrotta"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
     "reconchess",
     "tqdm",
+    "click",
 ]
 
 # What packages are optional?
@@ -46,12 +47,10 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
-    # If your package is a single module, use this instead of 'packages':
-    # py_modules=['mypackage'],
-    # entry_points={
-    #     'console_scripts': ['mycli=mymodule:cli'],
-    # },
+    packages=find_packages(exclude=["tests"]),
+    entry_points={
+        "console_scripts": ["reconchess-tools=reconchess_tools.cli.main:cli"],
+    },
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
