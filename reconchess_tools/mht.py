@@ -16,7 +16,7 @@ def board_fingerprint(board: chess.Board):
 
     This fingerprint is a tuple of integers and booleans that contains the same information as the
     extended position description (EPD). It does not contain all of the information in the FEN, e.g.
-    half-move counter, because those are not significant in reconchess. Two boards have the same
+    half-move counter, because those are not significant in reconchess. If two boards have the same
     fingerprint, they are identical as far as reconchess is concerned, including allowing the same
     requested moves, and having the same results for any sense or move action.
     """
